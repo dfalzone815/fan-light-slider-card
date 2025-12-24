@@ -657,7 +657,7 @@ class FanLightSliderCard extends LitElement {
     const title = this.config.title || entity.attributes.friendly_name || this.config.entity;
     const powerIcon = this.config.power_icon || "mdi:power";
 
-    const showSettings = this._isLight(entity.entity_id) && (this.config.show_settings === true);
+    const showSettings = (this.config.show_settings === true) && (this._isLight(entity.entity_id) || this._isSwitch(entity.entity_id));
     const cogIcon = this.config.cog_icon || "mdi:cog";
 
     const controlWidth = this.config.control_width;
