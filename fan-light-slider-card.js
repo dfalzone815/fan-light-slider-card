@@ -41,7 +41,7 @@ class FanLightSliderCard extends LitElement {
 
       --cog-bg: #e0e0e0;
       --cog-icon-color: #000000;
-      --cog-size: 35px;
+      --cog-size: 39px;
 
       /* Modal */
       --dlg-slider-width: 250px;
@@ -261,64 +261,62 @@ class FanLightSliderCard extends LitElement {
 
 
     /* ---------- Switch up/down toggle (switch.* entities) ---------- */
+    
+    
+    /* ---------- Switch pill toggle ---------- */
     .stoggle {
       height: var(--control-height);
       width: var(--control-width);
       margin: 0 auto;
-      background: #f6f6f6;
       border-radius: var(--control-radius);
-      padding: var(--pill-padding);
       box-sizing: border-box;
       position: relative;
       overflow: hidden;
+      cursor: pointer;
+      user-select: none;
+      padding: 0px; /* cell padding around button */
       display: flex;
-      flex-direction: column;
-      gap: 0;
+      align-items: stretch;
+      justify-content: stretch;
+      background: var(--switch-wrapper-off, #696969);
     }
 
-    .stoggle .seg {
-      flex: 1 1 50%;
+    .stoggle.on {
+      background: var(--switch-wrapper-on, #fff3cd);
+    }
+
+    .stoggle .btn {
+      width: 100%;
+      height: 100%;
+      border-radius: calc(var(--control-radius) - 5px);
+      position: relative;
+      overflow: hidden;
+      background: var(--switch-btn-off, #d9d9d9);
       display: flex;
       align-items: center;
       justify-content: center;
-      cursor: pointer;
-      user-select: none;
-      position: relative;
     }
 
-    .stoggle .seg.top { border-top-left-radius: calc(var(--control-radius) - 2px); border-top-right-radius: calc(var(--control-radius) - 2px); }
-    .stoggle .seg.bottom { border-bottom-left-radius: calc(var(--control-radius) - 2px); border-bottom-right-radius: calc(var(--control-radius) - 2px); }
-
-    /* inactive segment */
-    .stoggle .seg {
-      background: #ebebeb;
+    .stoggle.on .btn {
+      background: var(--switch-btn-on, #ffc107);
     }
 
-    /* active segment */
-    .stoggle.on .seg.top { background: var(--fill-color); }
-    .stoggle.on .seg.bottom { background: #ebebeb; }
-
-    .stoggle.off .seg.top { background: #ebebeb; }
-    .stoggle.off .seg.bottom { background: #9e9e9e; }
-
-    /* center indicator */
-    .stoggle .indicator {
-      position: absolute;
-      left: 50%;
-      top: 50%;
-      width: 14px;
-      height: 14px;
-      transform: translate(-50%, -50%);
+    .stoggle .btn .circle {
+      width: 18px;
+      height: 18px;
       border-radius: 50%;
-      background: transparent;
       border: 2px solid rgba(255,255,255,0.9);
       box-sizing: border-box;
-      pointer-events: none;
-      z-index: 2;
+      opacity: 0.95;
     }
 
-    .stoggle.on .indicator { border-color: rgba(255,255,255,0.9); }
-    .stoggle.off .indicator { border-color: rgba(255,255,255,0.9); }
+    .stoggle .btn ha-icon {
+      color: rgba(255,255,255,0.95);
+      --mdc-icon-size: 30px;
+    }
+
+    .stoggle.on .btn .circle { display: none; }
+    .stoggle.off .btn ha-icon { display: none; }
 
 
     /* ---------- Footer buttons ---------- */
@@ -537,6 +535,42 @@ class FanLightSliderCard extends LitElement {
     return this.config.settings_entity || this.config.entity;
   }
 
+
+  _switchSliderEntityId() {
+    // For switch cards: optional target entity controlled by the slider (e.g. light.* or fan.*)
+    return this.config.switch_slider_entity || this.config.settings_entity || null;
+  }
+
+  _domainOf(entityId) {
+    return String(entityId || "").split(".")[0];
+  }
+
+  _setTargetPercentage(entityId, pct) {
+    if (!entityId) return;
+    const domain = this._domainOf(entityId);
+    if (domain === "fan") {
+      this.hass.callService("fan", "set_percentage", { entity_id: entityId, percentage: pct });
+    } else if (domain === "light") {
+      this.hass.callService("light", "turn_on", { entity_id: entityId, brightness_pct: pct });
+    } else if (domain === "input_number") {
+      this.hass.callService("input_number", "set_value", { entity_id: entityId, value: pct });
+    }
+  }
+
+  _getTargetPct(entityId) {
+    if (!entityId) return 0;
+    const e = this.hass.states[entityId];
+    if (!e) return 0;
+    const domain = this._domainOf(entityId);
+    if (domain === "fan" && e.attributes?.percentage != null) return Number(e.attributes.percentage) || 0;
+    if (domain === "light" && e.attributes?.brightness != null) return Math.round((e.attributes.brightness / 255) * 100);
+    if (domain === "input_number" && e.state != null) {
+      const v = Number(e.state);
+      if (Number.isFinite(v)) return Math.round(v);
+    }
+    return 0;
+  }
+
   _openDialog = () => { this._dlgOpen = true; this.requestUpdate(); };
   _closeDialog = () => { this._dlgOpen = false; this.requestUpdate(); };
 
@@ -650,8 +684,34 @@ class FanLightSliderCard extends LitElement {
     const isFan = this._isFan(entity.entity_id);
     const isSwitch = this._isSwitch(entity.entity_id);
     const isOn = entity.state !== "off";
+    const switchSliderExplicit = this.config.switch_slider_entity;
+    const switchControl = isSwitch && switchSliderExplicit ? "slider" : "toggle";
+    const switchSliderTarget = isSwitch && switchControl === "slider" ? this._switchSliderEntityId() : null;
 
-    const pct = this._getPct(entity, isFan, isOn);
+    const switchSliderMissing = isSwitch && switchControl === "slider" && !switchSliderTarget;
+
+    if (switchSliderMissing) {
+      return html`
+        <ha-card>
+          <div style="padding:16px">
+            <div class="title">${title}</div>
+            <div style="margin-top:8px;font-size:14px;opacity:0.8">
+              Switch slider mode is enabled but no target entity was provided.
+            </div>
+            <div style="margin-top:6px;font-size:13px;opacity:0.8">
+              Set <b>switch_slider_entity</b> (or <b>settings_entity</b>).
+            </div>
+            <div class="footer" style="margin-top:14px">
+              <div class="power" @click=${this._toggle} role="button" tabindex="0" aria-label="Toggle power">
+                <ha-icon .icon=${powerIcon}></ha-icon>
+              </div>
+            </div>
+          </div>
+        </ha-card>
+      `;
+    }
+
+    const pct = (isSwitch && switchControl === "slider") ? (isOn ? this._getTargetPct(switchSliderTarget) : 0) : this._getPct(entity, isFan, isOn);
     const label = isSwitch ? (isOn ? "On" : "Off") : (isOn ? `${pct}%` : "Off");
 
     const title = this.config.title || entity.attributes.friendly_name || this.config.entity;
@@ -734,11 +794,12 @@ class FanLightSliderCard extends LitElement {
       </div>
     `;
 
-    const sliderUI = (isSwitch) ? html`
-      <div class="stoggle ${isOn ? "on" : "off"}" aria-label="Switch toggle">
-        <div class="seg top" @click=${() => this._setSwitch(true)} role="button" tabindex="0" aria-label="Turn on"></div>
-        <div class="seg bottom" @click=${() => this._setSwitch(false)} role="button" tabindex="0" aria-label="Turn off"></div>
-        <div class="indicator"></div>
+    const sliderUI = (isSwitch && switchControl !== "slider") ? html`
+      <div class="stoggle ${isOn ? "on" : "off"}" @click=${this._toggle} role="button" tabindex="0" aria-label="Toggle switch">
+        <div class="btn">
+          <ha-icon icon="mdi:power"></ha-icon>
+          <div class="circle"></div>
+        </div>
       </div>
     ` : html`
       <div class="slider-wrapper" aria-label="Vertical slider">
@@ -787,6 +848,23 @@ class FanLightSliderCard extends LitElement {
                 const minM = se.attributes.min_mireds ?? 153;
                 const maxM = se.attributes.max_mireds ?? 500;
                 return html`
+                  ${(() => {
+                    const sid = this._settingsEntityId();
+                    const se = this.hass.states[sid];
+                    if (se && this._isSwitch(se.entity_id)) {
+                      return html`
+                        <div class="modal-row">
+                          <div class="modal-ico"><ha-icon icon="mdi:toggle-switch"></ha-icon></div>
+                          <div class="htoggle ${se.state !== "off" ? "on" : ""}"
+                               role="button" tabindex="0"
+                               @click=${() => this.hass.callService("switch", se.state !== "off" ? "turn_off" : "turn_on", { entity_id: sid })}>
+                            ${se.state !== "off" ? "On" : "Off"}
+                          </div>
+                        </div>
+                      `;
+                    }
+                    return nothing;
+                  })()}
                   <div class="modal-row">
                     <div class="modal-ico"><ha-icon icon="mdi:palette"></ha-icon></div>
                     <input aria-label="Color" class="hslider color" type="range" min="0" max="360" step="1"
@@ -824,7 +902,11 @@ class FanLightSliderCard extends LitElement {
     const val = Number(e.target.value);
 
     if (isSwitch) {
-      // no-op (switch uses toggle UI)
+      const mode = (this.config.switch_control || "toggle").toLowerCase();
+      if (mode === "slider") {
+        const target = this._switchSliderEntityId();
+        this._setTargetPercentage(target, val);
+      }
       return;
     }
 
@@ -844,6 +926,11 @@ class FanLightSliderCard extends LitElement {
     const isFan = this._isFan(entity.entity_id);
     const isSwitch = this._isSwitch(entity.entity_id);
     const isOn = entity.state !== "off";
+    const switchSliderExplicit = this.config.switch_slider_entity;
+    const switchControl = isSwitch && switchSliderExplicit ? "slider" : "toggle";
+    const switchSliderTarget = isSwitch && switchControl === "slider" ? this._switchSliderEntityId() : null;
+
+    const switchSliderMissing = isSwitch && switchControl === "slider" && !switchSliderTarget;
     const domain = isSwitch ? "switch" : (isFan ? "fan" : "light");
     this.hass.callService(domain, isOn ? "turn_off" : "turn_on", { entity_id: this.config.entity });
   };
