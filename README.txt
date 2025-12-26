@@ -133,3 +133,94 @@ entity: switch.garage_lights
 --------------------------------------------------
 END OF FILE
 --------------------------------------------------
+
+
+--------------------------------------------------
+SWITCH SETTINGS SUPPORT
+--------------------------------------------------
+Switch cards now support the settings cog.
+
+Options:
+- show_settings: true
+  Enables the cog icon on switch cards.
+
+- settings_entity: switch.some_other_switch
+  Allows the popup to control a different switch.
+
+Popup behavior:
+- Displays a simple On / Off control
+- Uses switch.turn_on / switch.turn_off services
+
+
+--------------------------------------------------
+SWITCH: OPTIONAL SLIDER MODE
+--------------------------------------------------
+By default, switch entities use the vertical up/down toggle.
+
+You can optionally display a vertical slider on a switch card that controls a DIFFERENT target entity.
+
+Automatic behavior:
+- If switch_slider_entity is set, the switch card becomes a slider card (controlling that target entity).
+- If switch_slider_entity is not set, the switch card uses the default up/down toggle.
+(e.g. a dimmable light, a fan, or an input_number). The power button and main on/off still control
+the switch entity itself; the slider controls the target entity.
+
+Options:
+- switch_slider_entity: <entity_id>
+  Used when switch slider mode: slider (if omitted, settings_entity is used if provided)
+
+Examples:
+
+1) Switch card with slider controlling a light:
+switch_slider_entity: light.lamp_dimmer
+
+2) Switch card with slider controlling a fan percentage:
+switch_slider_entity: fan.ceiling_fan
+
+
+NOTE
+--------------------------------------------------
+To enable slider mode for a switch, set:
+  switch_slider_entity: <entity_id>
+(or provide settings_entity as a fallback)
+Otherwise the card will show a helpful message.
+
+
+--------------------------------------------------
+SWITCH VISUAL STYLE
+--------------------------------------------------
+Switch cards now use a tall pill-style toggle:
+- Top half shows ON state (highlighted)
+- Bottom half shows OFF state (dim)
+- Center circle indicator
+- Power icon at top when ON
+
+Colors can be customized with CSS variables:
+--switch-on-bg
+--switch-on-bg-dim
+--switch-off-bg
+
+
+Switch color vars:
+--switch-shell-bg
+--switch-on-bg
+--switch-on-bg-dim
+--switch-off-bg
+--switch-off-bg-on
+
+
+Switch visual states:
+- ON  → top half colored, bottom neutral
+- OFF → both halves neutral
+
+Switch pill color vars:
+--switch-on-bg        (default #ffc107)
+--switch-neutral-bg   (default #e6e6e6)
+--switch-bg           (default #f2f2f2)
+
+
+Switch pill colors (defaults):
+--switch-wrapper-on:  #fff3cd
+--switch-wrapper-off: #696969
+--switch-btn-on:      #ffc107
+--switch-btn-off:     #d9d9d9
